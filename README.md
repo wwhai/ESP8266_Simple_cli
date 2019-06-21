@@ -1,0 +1,2 @@
+# ESP8266_Simple_cli
+一个简单的通过串口配置NodeMcu的固件代码
