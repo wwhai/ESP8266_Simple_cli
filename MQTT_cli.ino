@@ -13,7 +13,8 @@
 #define BLUE_LED_GPIO 15
 #define DHT11_GPIO 5
 #define BUZZER_GPIO  14
-
+#define MQTT_MAX_TRANSFER_SIZE
+const char* clientId = "85C05BE9296E49EBAACA1A4BF77AD0E2";
 /*
    联网不一定连MQTT服务器
    不联网一定不连MQTT服务器
@@ -25,7 +26,7 @@ typedef struct SysConfig
 {
   char ssid[32];
   char password[32];
-  char mqttServer[64] = "localhost:1883";
+  char mqttServer[64] = "192.168.1.100";
   char mqttClientId[64] = "testEsp";
   char mqttUsername[64] = "system";
   char mqttPassword[64] = "password";
@@ -37,7 +38,8 @@ SysConfig sysConfig;
    连接Mqtt用的
 */
 WiFiClient espClient;
-PubSubClient mqttClient("localhost", 1883, espClient);
+PubSubClient mqttClient("192.168.1.100", 1883, espClient);
+//PubSubClient mqttClient(espClient);
 /**
    OLED 显示屏
 */
@@ -174,14 +176,14 @@ void initMqtt() {
 
   });
   for (int i = 0 ; i < 10; i++) {
-    //mqttClient.connect("NodeMcu10010");
-    mqttClient.connect(sysConfig.mqttClientId, sysConfig.mqttUsername, sysConfig.mqttPassword);
+    mqttClient.connect("NodeMcu10010");
+//    mqttClient.connect(sysConfig.mqttClientId, sysConfig.mqttUsername, sysConfig.mqttPassword);
     Serial.print("=>");
     delay(1000);
     if (mqttClient.connected()) {
       //连接成功
       //mqttClient.subscribe(String(String("/device/OUT/") + sysConfig.mqttClientId).c_str(), 2);
-      mqttClient.subscribe(String("mqttTestNodeMcu"), 2);
+      mqttClient.subscribe(String("mqttTestNodeMcu").c_str(),2);
       isConnectToMqtt = true;
       Serial.println("\n|Connect to mqtt success!");
       break;
@@ -332,33 +334,8 @@ JSONVar jsonDataPackage(JSONVar j2strData)
   JSONVar jsonData;
   jsonData["clientId"] = clientId;
   jsonData["value"] = JSON.stringify(j2strData);
-
+  
   return jsonData;
-}
-
-String post2server(JSONVar jdata)
-{
-   String line;
-   if(!espClient.connect(host,Port))
-   {
-    return "connection failed";
-   }
-   String data=JSON.stringify(jdata);
-   int length=data.length();
-   String postRequest =(String)("POST ") +url+ "/ HTTP/1.1\r\n" +
-          "Content-Type: application/json;charset=utf-8\r\n" +
-          "Host: " + host + ":" + Port + "\r\n" +
-          "User-Agent: ESP8266\r\n"+          
-          "Content-Length: " + length + "\r\n" +
-          "Connection: Keep Alive\r\n\r\n" +
-          data+"\r\n";
-   espClient.print(postRequest);
-   delay(100);
-    line = espClient.readStringUntil('\n');
-    while (espClient.available() > 0) {
-      line += espClient.readStringUntil('\n');
-    }
-   return line;
 }
 
 
@@ -367,14 +344,19 @@ String post2server(JSONVar jdata)
 
 //
 int count = 0;
+int flag=0;
+String publishData = "";
 void loop() {
   count += 1;
   if (isConnectToMqtt) {
     mqttClient.loop();
     if (count >= 100000) {
-      //mqttClient.publish("/device/IN/NodeMcuTest", JSON.stringify(getDHT11Data()));
-      Serial.println(post2server(jsonDataPackage(getDHT11Data())));
-      Serial.println(JSON.stringify(getDHT11Data()));
+      publishData = JSON.stringify(jsonDataPackage(getDHT11Data()));
+//      flag=mqttClient.publish("/device/IN/NodeMcuTest",publishData.c_str(),strlen(publishData.c_str()));
+      mqttClient.beginPublish("/device/IN/NodeMcuTest",strlen(publishData.c_str()),false);
+      mqttClient.print(publishData.c_str());
+      mqttClient.endPublish();
+      Serial.println(publishData+flag);
       count = 0;
 
     }
